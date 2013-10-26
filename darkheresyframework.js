@@ -16,7 +16,7 @@ dh.homeWorld = [
 
 /* Careers */
 
-dh.careers = [
+dh.career = [
     'adept',
     'arbitrator',
     'assassin',
@@ -81,26 +81,33 @@ dh.parseCommand = function parseCommand(msg) {
      *  Parameters: !cchar homeworld career name
      */
     if (msg.type == "api" && msg.content.indexOf("!cchar ") !== -1) {
-        var chararray = msg.content.replace("!cchar ", "").split(" ");
+        var charsetting = msg.content.replace("!cchar ", "").split(" ");
+        var whispertarget = msg.who.split(" ").reverse().pop();
 
-        if (dh.homeworld.contains(chararray[0].toLowerCase()) && chararray[0] !== "") {
-            if (dh.careers.contains(chararray[1].toLowerCase()) && chararray[1] !== "") {
-                if (chararray[2] !== "") {
-                    sendChat("System", "<b>" + msg.who + " created the " + chararray[0] + " " + chararray[1] + " " + chararray[2]"</b>");
-                } else {
-                    sendChat("System", "<b> Character creation failed: No name specified <b>");
-                }
-            } else {
-                sendChat("System", "<b> Character creation failed: Invalid Career </b>");
-            }
-        } else {
-            sendChat("System", "<b> Character creation failed: Invalid Homeworld </b>");
+        /* Consistency checks */
+        if (charsetting[0] === undefined || charsetting[1] === undefined || charsetting[2] === undefined) {
+            sendChat("System", "/w " + whispertarget + " <b><i>Can't create PC: Invalid arguments</i></b>");
+            log("Error: " + msg.who + "tried to create a PC but it failed. Reason: invalid arguments");
+            return;
         }
+
+        if (dh.homeWorld.indexOf(charsetting[0]) === -1) {
+            sendChat("System", "/w " + whispertarget + " <b><i>Can't create PC: Invalid Home World</i></b>");
+            log("Error: " + msg.who + " tried to create a PC but it failed. Reason: invalid arguments");
+            return;
+        }
+
+        if (dh.career.indexOf(charsetting[1]) === -1) {
+            sendChat("System", "/w " + whispertarget + " <b><i>Can't create PC: Invalid Career</i></b>");
+            log("Error: " + msg.who + " tried to create a PC but it failed. Reason: invalid arguments");
+            return;
+        }
+
+        dh.createPC(charsetting[0], charsetting[1]);
+        sendChat("System", "/w " + whispertarget + " <b><i> Successfully created the " + charsetting[0] + " " + charsetting[1] + " " + charsetting[2] + "</b>");
         return;
     }
 };
-
-dh.createPC = function createPC(homeworld, career) {};
 
 
 on("ready", function () {
