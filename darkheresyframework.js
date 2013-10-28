@@ -1,11 +1,5 @@
 var dh = dh || {};
 
-/* Dice Types */
-
-dh.dice100 = "1d100";
-dh.dice10 = "1d10";
-dh.dice5 = "1d5";
-
 /* Home World */
 
 dh.homeWorld = [
@@ -72,18 +66,35 @@ dh.wounds = [
     '8',
     '6'];
 
+dh.fate = [
+    [1, 2, 2],
+    [1, 2, 3],
+    [2, 2, 3],
+    [2, 3, 3]
+];
+
+dh.wealth = [
+             [100,1,10],
+             [50,2,10],
+             [120,3,10],
+             [300,5,10],
+             [70,1,10],
+             [50,1,5],
+             [10,1,5],
+             [150,1,10]
+             ];
+
 dh.parseCommand = function parseCommand(msg) {
     /* !cchar creates a new Player Character
      *  Parameters: !cchar homeworld career name
      */
     if (msg.type == "api" && msg.content.indexOf("!cchar ") !== -1) {
+    	
         var charsetting = msg.content.replace("!cchar ", "").split(" ");
         var whispertarget = msg.who.split(" ").reverse().pop();
-
         var world = charsetting[0];
         var career = charsetting[1];
         var name = charsetting[2];
-
 
         /* Consistency checks */
         if (world === undefined || career === undefined || name === undefined) {
@@ -103,7 +114,6 @@ dh.parseCommand = function parseCommand(msg) {
             log("Error: " + msg.who + " tried to create a PC but it failed. Reason: invalid arguments");
             return;
         }
-
         sendChat("System", "<b><i> Creating a PC for " + msg.who);
         log("Creating:" + world + " " + career + " " + name);
         dh.createPC(world, career, name, msg.who);
@@ -113,10 +123,9 @@ dh.parseCommand = function parseCommand(msg) {
 
 /*Roll and write Characteristics for the PC*/
 dh.rollCharacteristics = function rollCharacteristics(i, world, pc) {
-    sendChat("CC", "/r 2d10+" + dh.attr[i].mod[dh.homeWorld.indexOf(world)], function (rolls) {
+    sendChat("", "/r 2d10+" + dh.attr[i].mod[dh.homeWorld.indexOf(world)], function (rolls) {
         var parsed = JSON.parse(rolls[0].content);
-        sendChat("CC", dh.attr[i].name + ":<b> " + parsed.total + "</b> <i>(" + parsed.rolls[0].results[0].v + "+" + parsed.rolls[0].results[1].v + ")</i>");
-
+        sendChat("", dh.attr[i].name + ":<b> " + parsed.total + "</b> <i>(" + parsed.rolls[0].results[0].v + "+" + parsed.rolls[0].results[1].v + ")</i>");
         createObj("attribute", {
             name: dh.attr[i].name,
             current: parsed.total,
@@ -127,8 +136,7 @@ dh.rollCharacteristics = function rollCharacteristics(i, world, pc) {
 
 /*Iterate trough all Characteristics and roll them */
 dh.setCharacteristics = function setCharacteristics(world, pc) {
-
-    sendChat("CC", "<b>Rolling Characteristics - " + world + "</b>");
+    sendChat("", "/em <b>Rolling Characteristics - " + world + "</b>");
     for (var i in dh.attr) {
         dh.rollCharacteristics(i, world, pc);
     }
@@ -136,16 +144,63 @@ dh.setCharacteristics = function setCharacteristics(world, pc) {
 };
 
 dh.rollWounds = function rollWounds(world, pc) {
-    sendChat("CC", "/r 1d5+" + dh.wounds[dh.homeWorld.indexOf(world)], function (rolls) {
+    sendChat("", "/r 1d5+" + dh.wounds[dh.homeWorld.indexOf(world)], function (rolls) {
         var parsed = JSON.parse(rolls[0].content);
-        sendChat("CC", "Wounds:<b> " + parsed.total + "</b> <i>(" + parsed.rolls[0].results[0].v + ")</i>");
-
+        sendChat("", "Wounds:<b> " + parsed.total + "</b> <i>(" + parsed.rolls[0].results[0].v + ")</i>");
         createObj("attribute", {
             name: 'Wounds',
-            current: parsed.total,
+            current: '0',
+            max: parsed.total,
             characterid: pc.id
         });
     });
+};
+
+dh.rollFate = function rollFate(world, pc) {
+    var fate = 0;
+    var i = dh.homeWorld.indexOf(world);
+    sendChat("", "/r 1d10", function (rolls) {
+        var parsed = JSON.parse(rolls[0].content);
+        switch (parsed.total) {
+            case 1:
+            case 2:
+            case 3:
+            case 4:
+                fate = dh.fate[i][0];
+                break;
+            case 5:
+            case 6:
+            case 7:
+            case 8:
+                fate = dh.fate[i][1];
+                break;
+            case 9:
+            case 10:
+                fate = dh.fate[i][2];
+                break;
+            default:
+                log("Error: Unreachable Part of Code: rollFate");
+        }
+        sendChat("", "Fate Points:<b> " + fate + "</b> <i>(" + parsed.rolls[0].results[0].v + ")</i>");
+        createObj("attribute", {
+            name: 'Fate Points',
+            current: fate,
+            characterid: pc.id
+        });
+    });
+};
+
+dh.rollWealth = function rollWealth(career, pc) {
+	var i = dh.career.indexOf(career);
+	sendChat("", "/r " + dh.wealth[i][1] + "d" + dh.wealth[i][2] + "+" + dh.wealth[i][0], function(rolls){
+        var parsed = JSON.parse(rolls[0].content);
+        
+        createObj("attribute", {
+            name: 'Wealth',
+            current: parsed.total,
+            characterid: pc.id
+        });
+	});
 };
 
 dh.createPC = function createPC(world, career, name, who) {
@@ -154,11 +209,12 @@ dh.createPC = function createPC(world, career, name, who) {
         name: name,
         inplayerjournals: 'all'
     });
+
     dh.setCharacteristics(world, pcobj);
     dh.rollWounds(world, pcobj);
-    /*dh.rollFate(world, pcobj);
+    dh.rollFate(world, pcobj);
     dh.rollWealth(career, pcobj);
-    createHomeWorldSkills(settings[0], pcobj);
+    /*createHomeWorldSkills(settings[0], pcobj);
     createHomeWorldTraits(settings[0], pcobj);
     createCareerSkills(settings[1], pcobj);
     createCareerTalents(settings[1], pcobj);
